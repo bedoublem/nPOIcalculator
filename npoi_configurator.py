@@ -420,7 +420,7 @@ def main():
     with st.sidebar:
         st.markdown("### ⚙️ Paramètres")
 
-        nb_secteurs = st.slider("Nombre de secteurs", 1, 12, 3)
+        nb_secteurs = st.slider("Nombre de secteurs", 1, 12, 1)
 
         st.markdown("**Opérateurs**")
         operateurs = st.multiselect(
