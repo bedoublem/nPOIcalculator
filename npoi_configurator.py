@@ -3,7 +3,7 @@ nPOI DAS Configurator - Application Streamlit
 Génère un fichier Excel d'organisation des entrées RF sur des unités nPOI (1U Rack 19", 8 ports)
 
 Notation :
-  - Fréquences codes courts : 7, 8, 9, 18, 21, 26, 35
+  - Fréquences codes courts : 700, 800, 900, 18, 21, 26, 35
   - SISO  : S1-MNO1-18
   - MIMO  : S1-MNO1-18A  et  S1-MNO1-18B
 
@@ -25,8 +25,8 @@ import io
 FREQUENCES_ORDRE = ["700", "800", "900", "1800", "2100", "2600", "3500"]
 
 FREQ_CODE = {
-    "700":  "7",
-    "800":  "8",
+    "700":  "700",
+    "800":  "800",
     "900":  "9",
     "1800": "18",
     "2100": "21",
@@ -129,13 +129,59 @@ def construire_ports(nb_secteurs, operateurs, config_freq, tri):
 
 
 def grouper_en_npoi(ports):
+    """Découpe séquentiellement en groupes de 8."""
     return [ports[i:i + 8] for i in range(0, len(ports), 8)]
+
+
+def grouper_en_npoi_optimise(ports):
+    """
+    Groupage optimisé : on crée des blocs (secteur x fréquence) et on les
+    bin-packs dans des nPOI de 8 ports en regroupant les blocs de même secteur.
+    Algorithme First-Fit avec préférence de secteur.
+    """
+    from collections import defaultdict
+
+    # Construire les blocs (secteur, freq) -> liste de ports
+    blocs = defaultdict(list)
+    for port in ports:
+        key = (port["secteur"], port["frequence"])
+        blocs[key].append(port)
+
+    # Trier : secteur d'abord, puis fréquence selon ordre défini
+    blocs_list = sorted(
+        blocs.values(),
+        key=lambda b: (b[0]["secteur"], FREQUENCES_ORDRE.index(b[0]["frequence"]))
+    )
+
+    # Bin-packing avec préférence de secteur
+    npois = []
+    for bloc in blocs_list:
+        taille = len(bloc)
+        # Cherche d'abord un nPOI avec même secteur ET assez de place
+        meme_secteur = [
+            i for i, n in enumerate(npois)
+            if len(n) + taille <= 8
+            and any(p["secteur"] == bloc[0]["secteur"] for p in n if p)
+        ]
+        autre = [
+            i for i, n in enumerate(npois)
+            if len(n) + taille <= 8
+            and i not in meme_secteur
+        ]
+        candidats = meme_secteur + autre
+        if candidats:
+            npois[candidats[0]].extend(bloc)
+        else:
+            npois.append(list(bloc))
+
+    # Compléter à 8 avec None pour les ports libres
+    return [n + [None] * (8 - len(n)) for n in npois]
 
 
 # ── Génération Excel ───────────────────────────────────────────────────────────
 
 def style_cell(ws, coord, valeur, bg_hex, fg_hex,
-               bold=False, align="left", border=True, size=11):
+               bold=False, align="left", border=True, size=13):
     cell = ws[coord]
     cell.value = valeur
     cell.font = Font(name="Consolas", size=size, bold=bold, color=fg_hex)
@@ -365,7 +411,7 @@ def main():
             📡 nPOI DAS CONFIGURATOR
         </span><br>
         <span style="font-size:12px;color:#7ec8e3;letter-spacing:3px;">
-            DISTRIBUTED ANTENNA SYSTEM · RACK 19" 1U · 8 PORTS RF PAR nPOI
+            DISTRIBUTED ANTENNA SYSTEM · RACK 19" 1U
         </span>
     </div>
     """, unsafe_allow_html=True)
@@ -379,8 +425,8 @@ def main():
         st.markdown("**Opérateurs**")
         operateurs = st.multiselect(
             "Sélectionner les opérateurs",
-            options=["MNO1", "MNO2", "MNO3", "MNO4", "OFR", "BYT","SFR", 
-                     "Free", "OBE", "PXS", "TNT"],
+            options=["MNO1", "MNO2", "MNO3", "Orange", "SFR", "Bouygues",
+                     "Free", "VOO", "Proximus", "BASE"],
             default=["MNO1", "MNO2"],
         )
         op_custom = st.text_input("Opérateur personnalisé", placeholder="Ex: Telenet")
@@ -413,6 +459,13 @@ def main():
         tri = st.radio("Trier les ports par",
                        options=["Par fréquence", "Par opérateur"], index=0)
 
+        st.markdown("---")
+        optimiser = st.checkbox(
+            "🔀 Optimiser le groupage",
+            value=False,
+            help="Regroupe les frequences d'un meme secteur dans le meme nPOI."
+        )
+
     # ── Validation ────────────────────────────────────────────────────────────
     if not operateurs:
         st.warning("⚠️ Veuillez sélectionner au moins un opérateur.")
@@ -423,13 +476,14 @@ def main():
 
     # ── Calcul ────────────────────────────────────────────────────────────────
     ports = construire_ports(nb_secteurs, operateurs, config_freq, tri)
-    npois = grouper_en_npoi(ports)
+    npois = grouper_en_npoi_optimise(ports) if optimiser else grouper_en_npoi(ports)
 
     # ── Métriques ─────────────────────────────────────────────────────────────
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("nPOI nécessaires", len(npois))
-    c2.metric("Ports utilisés", len(ports))
-    c3.metric("Ports libres", len(npois) * 8 - len(ports))
+    ports_reels = [p for p in ports if p is not None]
+    c2.metric("Ports utilisés", len(ports_reels))
+    c3.metric("Ports libres", len(npois) * 8 - len(ports_reels))
     c4.metric("Unités de rack", f"{len(npois)} U")
 
     # ── Récap fréquences ──────────────────────────────────────────────────────
