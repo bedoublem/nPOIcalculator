@@ -379,8 +379,8 @@ def main():
         st.markdown("**Opérateurs**")
         operateurs = st.multiselect(
             "Sélectionner les opérateurs",
-            options=["MNO1", "MNO2", "MNO3", "Orange", "SFR", "Bouygues",
-                     "Free", "VOO", "Proximus", "BASE"],
+            options=["MNO1", "MNO2", "MNO3", "MNO4", "OFR", "BYT","SFR", 
+                     "Free", "OBE", "PXS", "TNT"],
             default=["MNO1", "MNO2"],
         )
         op_custom = st.text_input("Opérateur personnalisé", placeholder="Ex: Telenet")
