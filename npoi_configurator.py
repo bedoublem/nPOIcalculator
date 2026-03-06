@@ -54,26 +54,26 @@ OP_COLORS_HTML = [
     ("#E0FFFF", "#1A3A4A"),
 ]
 
-# Couleurs Excel (fond foncé)
+# Couleurs Excel (fond clair, texte foncé)
 FREQ_COLORS_XL = {
-    "700":  ("1A3A5C", "7EC8E3"),
-    "800":  ("122840", "6AB8D8"),
-    "900":  ("1A4A2A", "7ED9A0"),
-    "1800": ("4A1A1A", "E37E7E"),
-    "2100": ("3A1A4A", "C07EE3"),
-    "2600": ("4A3A1A", "E3C07E"),
-    "3500": ("1A3A4A", "7EC0E3"),
+    "700":  ("DDEEFF", "1A3A5C"),
+    "800":  ("C8E0FF", "102840"),
+    "900":  ("DDFFEE", "1A4A2A"),
+    "1800": ("FFDDDD", "4A1A1A"),
+    "2100": ("EEDDFF", "3A1A4A"),
+    "2600": ("FFF3DD", "4A3A1A"),
+    "3500": ("E0FFFF", "1A3A4A"),
 }
 OP_COLORS_XL = [
-    ("1A3A5C", "7EC8E3"),
-    ("1A4A2A", "7ED9A0"),
-    ("4A1A1A", "E37E7E"),
-    ("3A1A4A", "C07EE3"),
-    ("4A3A1A", "E3C07E"),
-    ("1A3A4A", "7EC0E3"),
+    ("DDEEFF", "1A3A5C"),
+    ("DDFFEE", "1A4A2A"),
+    ("FFDDDD", "4A1A1A"),
+    ("EEDDFF", "3A1A4A"),
+    ("FFF3DD", "4A3A1A"),
+    ("E0FFFF", "1A3A4A"),
 ]
 
-GRIS_LIBRE  = ("DDDDDD", "999999")
+GRIS_LIBRE  = ("F0F0F0", "999999")
 ENTETE_FOND = "0D1B2A"
 
 
