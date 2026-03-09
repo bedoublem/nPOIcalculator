@@ -129,7 +129,75 @@ def construire_ports(nb_secteurs, operateurs, config_freq, tri):
 
 
 def grouper_en_npoi(ports):
+    """Découpe séquentielle en groupes de 8 — zéro port libre, fréquences mélangées."""
     return [ports[i:i + 8] for i in range(0, len(ports), 8)]
+
+
+def grouper_en_npoi_optimise(ports):
+    """
+    Groupage optimisé Best-Fit Decreasing (BFD) :
+    - Les ports d'une même (fréquence x secteur) restent TOUJOURS dans le même nPOI.
+    - Les blocs les plus grands sont placés en premier (BFD).
+    - Chaque bloc va dans le nPOI le plus rempli qui peut encore l'accueillir.
+    - Tri interne : secteur → fréquence → opérateur → chaîne.
+    Garantit le minimum de nPOI possible tout en conservant les blocs fréq/secteur intacts.
+    """
+    from collections import defaultdict
+
+    # Tenter de grouper toute une fréquence si elle tient dans 8 ports
+    blocs_f = defaultdict(list)
+    for p in ports:
+        blocs_f[p["frequence"]].append(p)
+
+    blocs_finals = []
+    for freq in FREQUENCES_ORDRE:
+        if freq not in blocs_f:
+            continue
+        bloc_freq = blocs_f[freq]
+        if len(bloc_freq) <= 8:
+            blocs_finals.append(bloc_freq)
+        else:
+            # Trop grand → découper par secteur
+            par_secteur = defaultdict(list)
+            for p in bloc_freq:
+                par_secteur[p["secteur"]].append(p)
+            for s in sorted(par_secteur):
+                sous = par_secteur[s]
+                if len(sous) <= 8:
+                    blocs_finals.append(sous)
+                else:
+                    # Encore trop grand → découper par opérateur
+                    par_op = defaultdict(list)
+                    for p in sous:
+                        par_op[p["operateur"]].append(p)
+                    for op in sorted(par_op):
+                        blocs_finals.append(par_op[op])
+
+    # BFD : trier par taille décroissante
+    blocs_sorted = sorted(blocs_finals, key=lambda b: -len(b))
+    npois = []
+    for bloc in blocs_sorted:
+        taille = len(bloc)
+        best_idx, best_fill = -1, -1
+        for i, npoi in enumerate(npois):
+            if 8 - len(npoi) >= taille and len(npoi) > best_fill:
+                best_idx, best_fill = i, len(npoi)
+        if best_idx >= 0:
+            npois[best_idx].extend(bloc)
+        else:
+            npois.append(list(bloc))
+
+    # Tri interne : secteur → fréquence → opérateur → chaîne
+    for npoi in npois:
+        npoi.sort(key=lambda p: (
+            p["secteur"],
+            FREQUENCES_ORDRE.index(p["frequence"]),
+            p["operateur"],
+            p["chaine"] or "",
+        ))
+
+    # Compléter à 8 avec None (ports libres)
+    return [n + [None] * (8 - len(n)) for n in npois]
 
 
 # ── Génération Excel ───────────────────────────────────────────────────────────
@@ -177,7 +245,7 @@ def generer_excel(nb_secteurs, operateurs, config_freq, tri, npois):
         ws1.merge_cells(f"A{row}:G{row}")
         ws1.row_dimensions[row].height = 22
         style_cell(ws1, f"A{row}",
-                   f"  nPOI {idx+1}   —   1U Rack 19\"   —   {len(npoi)}/8 ports utilisés",
+                   f"  nPOI {idx+1}   —   1U Rack 19\"   —   {sum(1 for p in npoi if p is not None)}/8 ports utilisés",
                    "0D1B2A", "7EC8E3", bold=True, align="left", size=11)
         row += 1
 
@@ -413,6 +481,21 @@ def main():
         tri = st.radio("Trier les ports par",
                        options=["Par fréquence", "Par opérateur"], index=0)
 
+        st.markdown("---")
+        st.markdown("**Mode d'agencement**")
+        mode_groupage = st.radio(
+            "Agencement des nPOI",
+            options=["Séquentiel", "Groupé par fréquence (optimisé)"],
+            index=1,
+            help=(
+                "**Séquentiel** : remplit les nPOI dans l'ordre, zéro port libre, "
+                "mais les fréquences peuvent être mélangées.\n\n"
+                "**Groupé** : chaque bloc (fréquence × secteur) reste intact dans "
+                "le même nPOI — algorithme Best-Fit Decreasing pour minimiser le "
+                "nombre de nPOI."
+            ),
+        )
+
     # ── Validation ────────────────────────────────────────────────────────────
     if not operateurs:
         st.warning("⚠️ Veuillez sélectionner au moins un opérateur.")
@@ -423,13 +506,19 @@ def main():
 
     # ── Calcul ────────────────────────────────────────────────────────────────
     ports = construire_ports(nb_secteurs, operateurs, config_freq, tri)
-    npois = grouper_en_npoi(ports)
+    if mode_groupage == "Groupé par fréquence (optimisé)":
+        npois = grouper_en_npoi_optimise(ports)
+    else:
+        npois = grouper_en_npoi(ports)
+
+    ports_reels = len(ports)
+    ports_libres = sum(1 for npoi in npois for p in npoi if p is None)
 
     # ── Métriques ─────────────────────────────────────────────────────────────
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("nPOI nécessaires", len(npois))
-    c2.metric("Ports utilisés", len(ports))
-    c3.metric("Ports libres", len(npois) * 8 - len(ports))
+    c2.metric("Ports utilisés", ports_reels)
+    c3.metric("Ports libres", ports_libres)
     c4.metric("Unités de rack", f"{len(npois)} U")
 
     # ── Récap fréquences ──────────────────────────────────────────────────────
@@ -474,9 +563,12 @@ def main():
             return OP_COLORS_HTML[idx % len(OP_COLORS_HTML)]
 
     for idx, npoi in enumerate(npois):
+        # pad to 8 if needed (sequential mode)
+        npoi_padded = list(npoi) + [None] * (8 - len(npoi))
+        ports_used = sum(1 for p in npoi_padded if p is not None)
         cells_html = ""
         for p in range(8):
-            port = npoi[p] if p < len(npoi) else None
+            port = npoi_padded[p]
             bg, fg = get_color_html(port)
             if port:
                 line1 = f"{port['secteur']}-{port['operateur']}"
@@ -495,7 +587,7 @@ def main():
         st.markdown(
             f'<div class="npoi-block">'
             f'<div class="npoi-title">'
-            f'🔌 nPOI {idx+1} &nbsp;—&nbsp; {len(npoi)}/8 ports utilisés'
+            f'🔌 nPOI {idx+1} &nbsp;—&nbsp; {ports_used}/8 ports utilisés'
             f'</div>'
             f'<div class="ports-row">{cells_html}</div>'
             f'</div>',
