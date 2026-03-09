@@ -391,7 +391,7 @@ def main():
     .npoi-title {
         font-family: 'Exo 2', sans-serif;
         font-weight: 700;
-        font-size: 14px;
+        font-size: 16px;
         color: #1a3a5c;
         background: #ddeeff;
         border-radius: 4px;
@@ -407,7 +407,7 @@ def main():
         flex: 1;
         border-radius: 4px;
         padding: 7px 3px;
-        font-size: 10px;
+        font-size: 16px;
         font-family: 'Share Tech Mono', monospace;
         text-align: center;
         border: 1px solid rgba(0,0,0,0.12);
@@ -416,7 +416,7 @@ def main():
     }
     .port-num {
         font-weight: bold;
-        font-size: 9px;
+        font-size: 14px;
         opacity: 0.65;
         display: block;
         margin-bottom: 2px;
