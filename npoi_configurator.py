@@ -478,7 +478,7 @@ def main():
             config_freq[freq] = mode
 
         st.markdown("---")
-        tri = st.radio("Trier les ports par",
+        tri = st.radio("Visualiser les ports par",
                        options=["Par fréquence", "Par opérateur"], index=0)
 
         st.markdown("---")
