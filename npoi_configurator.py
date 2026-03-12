@@ -114,14 +114,14 @@ def construire_ports(nb_secteurs, operateurs, config_freq, tri):
 
     if tri == "Par fréquence":
         ports.sort(key=lambda p: (
-            FREQUENCES_ORDRE.index(p["secteur"]),
-            p["frequence"],
+            p["secteur"],
+            FREQUENCES_ORDRE.index(p["frequence"]),
             p["operateur"],
         ))
     else:
         ports.sort(key=lambda p: (
-            p["operateur"],
             p["secteur"],
+            p["operateur"],          
             FREQUENCES_ORDRE.index(p["frequence"]),
         ))
 
